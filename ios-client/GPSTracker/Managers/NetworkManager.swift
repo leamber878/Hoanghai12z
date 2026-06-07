@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import UIKit
 
 // ==========================================
 //  NetworkManager - Giao tiếp với server
