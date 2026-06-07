@@ -14,31 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 🔧 Xcode Version
-        run: xcodebuild -version
-
       - name: 🏗️ Generate Project
         working-directory: ios-client
         run: |
           brew install xcodegen
           xcodegen generate
-          ls -la
 
-      - name: 👀 List simulators
-        run: xcrun simctl list devices available 2>&1 | head -20
-
-      - name: 🛠️ Build for Simulator
-        id: build
+      - name: 🛠️ Build
         working-directory: ios-client
         run: |
           set -o pipefail
-          mkdir -p Build
-          xcodebuild -sdk iphonesimulator -project GPSTracker.xcodeproj -scheme GPSTracker -configuration Debug clean build 2>&1 | tee Build/xcodebuild.log
-
-      - name: 📤 Upload Build Log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: ios-client/Build/xcodebuild.log
-          retention-days: 7
+          xcodebuild -project GPSTracker.xcodeproj -scheme GPSTracker -configuration Debug -destination "generic/platform=iOS Simulator" clean build CODE_SIGNING_ALLOWED=NO 2>&1 | tail -100
