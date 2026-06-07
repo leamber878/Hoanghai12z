@@ -1,0 +1,210 @@
+# ==========================================
+#  🏗️ Build GPS Tracker iOS App → IPA
+#  Chạy trên GitHub macOS runner
+#  Cần set secrets trong GitHub repo:
+#   - IOS_SIGNING_IDENTITY: "Apple Distribution: Your Name (TEAMID)"
+#   - IOS_TEAM_ID: "TEAMID"
+#   - IOS_PROVISIONING_PROFILE: base64 của .mobileprovision
+#   - IOS_CERTIFICATE_DATA: base64 của .p12
+#   - IOS_CERTIFICATE_PASSWORD: passphrase của .p12
+#   - KEYCHAIN_PASSWORD: password tạo keychain tạm
+# ==========================================
+
+name: Build IPA
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'ios-client/**'
+      - '.github/workflows/build-ipa.yml'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:  # Cho phép chạy tay từ GitHub UI
+    inputs:
+      export_method:
+        description: 'Export method (development | app-store | ad-hoc | enterprise)'
+        default: 'development'
+        required: true
+      configuration:
+        description: 'Build configuration (Debug | Release)'
+        default: 'Debug'
+        required: true
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-14  # Apple Silicon runner (M1/M2)
+    timeout-minutes: 30
+
+    steps:
+      # === Checkout code ===
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # === Select Xcode version ===
+      - name: 🔧 Select Xcode
+        run: |
+          ls /Applications | grep Xcode
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || \
+          sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer || true
+          xcodebuild -version
+
+      # === Cache .build (SwiftPM) ===
+      - name: 💾 Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('ios-client/**') }}
+          restore-keys: |
+            ${{ runner.os }}-deriveddata-
+
+      # === Generate Xcode project (nếu dùng XcodeGen) ===
+      - name: 🏗️ Generate Xcode Project
+        working-directory: ios-client
+        run: |
+          if command -v xcodegen &> /dev/null; then
+            xcodegen generate
+            echo "✅ Xcode project generated with xcodegen"
+          else
+            echo "⚠️ xcodegen not found, sẽ dùng project có sẵn"
+          fi
+        continue-on-error: true
+
+      # === Install signing certificates (nếu có secret) ===
+      - name: 🔐 Install Signing Certificate
+        if: ${{ secrets.IOS_CERTIFICATE_DATA != '' }}
+        env:
+          CERT_DATA: ${{ secrets.IOS_CERTIFICATE_DATA }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temp-keychain-pw' }}
+        run: |
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 3600 build.keychain
+
+          # Import certificate
+          echo "$CERT_DATA" | base64 --decode > cert.p12
+          security import cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm cert.p12
+
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Install provisioning profile
+          if [[ -n "${{ secrets.IOS_PROVISIONING_PROFILE }}" ]]; then
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            echo "${{ secrets.IOS_PROVISIONING_PROFILE }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/GPS_Profile.mobileprovision
+          fi
+          echo "✅ Certificates installed"
+
+      # === Build app ===
+      - name: 🛠️ Build
+        id: build
+        working-directory: ios-client
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY || 'Apple Development' }}
+          EXPORT_METHOD: ${{ github.event.inputs.export_method || 'development' }}
+          CONFIG: ${{ github.event.inputs.configuration || 'Debug' }}
+        run: |
+          # Find .xcworkspace or .xcodeproj
+          PROJECT=$(ls *.xcworkspace 2>/dev/null || ls *.xcodeproj 2>/dev/null || echo "")
+          if [[ -z "$PROJECT" ]]; then
+            echo "❌ No Xcode project found!"
+            ls -la
+            exit 1
+          fi
+
+          echo "📦 Building: $PROJECT"
+          echo "📱 Export method: $EXPORT_METHOD"
+          echo "⚙️ Configuration: $CONFIG"
+
+          # Build archive
+          xcodebuild clean archive \
+            -project "$PROJECT" \
+            -scheme GPSTracker \
+            -configuration "$CONFIG" \
+            -destination "generic/platform=iOS" \
+            -archivePath Build/GPSTracker.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            | xcpretty || xcodebuild clean archive \
+            -project "$PROJECT" \
+            -scheme GPSTracker \
+            -configuration "$CONFIG" \
+            -destination "generic/platform=iOS" \
+            -archivePath Build/GPSTracker.xcarchive \
+            CODE_SIGN_STYLE=Automatic \
+            | xcpretty
+
+      # === Export IPA ===
+      - name: 📦 Export IPA
+        if: ${{ success() }}
+        working-directory: ios-client
+        env:
+          EXPORT_METHOD: ${{ github.event.inputs.export_method || 'development' }}
+        run: |
+          # Create export plist
+          cat > Build/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>${EXPORT_METHOD}</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>generateAppStoreInformation</key>
+            <false/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+
+          # Export IPA
+          xcodebuild -exportArchive \
+            -archivePath Build/GPSTracker.xcarchive \
+            -exportPath Build/ \
+            -exportOptionsPlist Build/ExportOptions.plist \
+            | xcpretty || true
+
+      # === Upload IPA artifact ===
+      - name: 📤 Upload IPA
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: GPSTracker-${{ github.sha }}.ipa
+          path: ios-client/Build/*.ipa
+          if-no-files-found: warn
+          retention-days: 7
+
+      # === Upload dSYM (for crash reporting) ===
+      - name: 📤 Upload dSYM
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: GPSTracker-dSYM-${{ github.sha }}
+          path: ios-client/Build/*.xcarchive/dSYMs/**/*.dSYM
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # === Notify ===
+      - name: 💬 Notify
+        if: ${{ always() }}
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "✅ Build IPA thành công!"
+            echo "📱 File IPA: GPSTracker-${{ github.sha }}.ipa"
+          else
+            echo "❌ Build thất bại!"
+          fi

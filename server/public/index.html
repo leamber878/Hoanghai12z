@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛰️ GPS Tracking Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🛰️ GPS Tracking</h1>
+      <div class="header-info">
+        <span id="status-badge" class="badge badge-offline">⏳ Connecting...</span>
+        <span id="device-count">📱 0 devices</span>
+        <span id="location-count">📍 0 locations</span>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <!-- Map -->
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="panel devices-panel">
+          <h3>📱 Devices</h3>
+          <div id="devices-list" class="device-list">
+            <div class="loading">Loading devices...</div>
+          </div>
+        </div>
+
+        <div class="panel realtime-panel">
+          <h3>⚡ Real-time</h3>
+          <div id="realtime-log" class="realtime-log">
+            <div class="empty-state">Chờ dữ liệu realtime...</div>
+          </div>
+        </div>
+
+        <div class="panel config-panel">
+          <h3>⚙️ Kết nối</h3>
+          <div class="config-item">
+            <label>Server URL:</label>
+            <input type="text" id="server-url" readonly>
+          </div>
+          <div class="config-item">
+            <label>API Key:</label>
+            <input type="text" id="api-key" value="gps-tracker-secret-key-2024">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

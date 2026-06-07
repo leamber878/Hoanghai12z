@@ -1,0 +1,21 @@
+# Node
+node_modules/
+npm-debug.log*
+.env
+
+# Build
+server/data/
+ios-client/Build/
+ios-client/*.xcworkspace/
+ios-client/*.xcodeproj/
+ios-client/DerivedData/
+
+# macOS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Xcode
+ios-client/*.xcuserdata/
+ios-client/*.xcworkspace/xcuserdata/
