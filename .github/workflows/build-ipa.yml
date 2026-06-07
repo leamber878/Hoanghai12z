@@ -59,17 +59,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deriveddata-
 
-      # === Generate Xcode project (nếu dùng XcodeGen) ===
+      # === Install XcodeGen & generate project ===
       - name: 🏗️ Generate Xcode Project
         working-directory: ios-client
         run: |
-          if command -v xcodegen &> /dev/null; then
-            xcodegen generate
-            echo "✅ Xcode project generated with xcodegen"
-          else
-            echo "⚠️ xcodegen not found, sẽ dùng project có sẵn"
-          fi
-        continue-on-error: true
+          brew install xcodegen
+          xcodegen generate
+          echo "✅ Xcode project generated with XcodeGen"
+          ls -la *.xcodeproj 2>/dev/null || echo "⚠️ No .xcodeproj generated"
 
       # === Install signing certificates (nếu có secret) ===
       - name: 🔐 Install Signing Certificate
