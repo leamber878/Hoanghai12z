@@ -21,7 +21,25 @@ jobs:
           xcodegen generate
 
       - name: 🛠️ Build
+        id: build
         working-directory: ios-client
         run: |
           set -o pipefail
-          xcodebuild -project GPSTracker.xcodeproj -scheme GPSTracker -configuration Debug -destination "generic/platform=iOS Simulator" clean build CODE_SIGNING_ALLOWED=NO 2>&1 | tail -100
+          mkdir -p Build
+          xcodebuild -project GPSTracker.xcodeproj -scheme GPSTracker -configuration Debug -destination "generic/platform=iOS Simulator" clean build CODE_SIGNING_ALLOWED=NO 2>&1 | tee Build/xcodebuild.log
+
+      - name: 📤 Upload Build Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ios-client/Build/xcodebuild.log
+          retention-days: 7
+
+      - name: 📤 Upload Archive
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GPSTracker.xcarchive
+          path: ios-client/Build/GPSTracker.xcarchive
+          retention-days: 3
