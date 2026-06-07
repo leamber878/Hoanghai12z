@@ -1,7 +1,3 @@
-# ==========================================
-#  🏗️ Build GPS Tracker iOS App → IPA
-# ==========================================
-
 name: Build IPA
 
 on:
@@ -10,48 +6,51 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Test Runner
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ Ubuntu runner works!"
+      - run: uname -a
+
   build:
     name: Build iOS App
     runs-on: macos-latest
+    needs: test
     timeout-minutes: 30
-
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: 🔧 Xcode Version
         run: xcodebuild -version
 
-      - name: 🏗️ Generate Xcode Project
+      - name: 📦 Check files
+        working-directory: ios-client
+        run: ls -la
+
+      - name: 🏗️ Generate Project
         working-directory: ios-client
         run: |
           brew install xcodegen
           xcodegen generate
-          echo "✅ Project generated"
           ls -la *.xcodeproj
 
       - name: 🛠️ Archive
         working-directory: ios-client
         run: |
-          PROJECT=$(ls *.xcodeproj | head -1)
-          echo "📦 Project: $PROJECT"
           xcodebuild clean archive \
-            -project "$PROJECT" \
+            -project GPSTracker.xcodeproj \
             -scheme GPSTracker \
             -configuration Debug \
             -destination "generic/platform=iOS" \
             -archivePath Build/GPSTracker.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: 📤 Upload Artifact
+      - name: 📤 Upload
         uses: actions/upload-artifact@v4
         with:
           name: GPSTracker.xcarchive
           path: ios-client/Build/GPSTracker.xcarchive
-          retention-days: 7
-
-      - name: 💬 Done
-        run: echo "✅ Build complete! Download .xcarchive from artifacts."
+          retention-days: 3
