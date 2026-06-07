@@ -14,22 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 🔧 Xcode & Swift Version
-        run: |
-          xcodebuild -version
-          swift --version
+      - name: 🔧 Xcode Version
+        run: xcodebuild -version
 
       - name: 🏗️ Generate Project
         working-directory: ios-client
         run: |
           brew install xcodegen
           xcodegen generate
-          echo "✅ Project:"
-          ls -la *.xcodeproj
+          ls -la
 
-      - name: 🛠️ Build Archive
+      - name: 🛠️ Archive
+        id: build
         working-directory: ios-client
         run: |
+          mkdir -p Build
           set -o pipefail
           xcodebuild clean archive \
             -project GPSTracker.xcodeproj \
@@ -40,10 +39,18 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
-            2>&1 | tee build.log | xcpretty --color --report junit || \
-          (echo "=== BUILD FAILED. Raw log tail ===" && tail -100 build.log && exit 1)
+            2>&1 | tee Build/xcodebuild.log
 
-      - name: 📤 Upload Artifact
+      - name: 📤 Upload Build Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ios-client/Build/xcodebuild.log
+          retention-days: 7
+
+      - name: 📤 Upload Archive
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: GPSTracker.xcarchive
