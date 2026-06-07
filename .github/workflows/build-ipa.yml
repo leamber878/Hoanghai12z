@@ -24,21 +24,18 @@ jobs:
           xcodegen generate
           ls -la
 
-      - name: 🛠️ Archive
+      - name: 🛠️ Build (simulator, no signing)
         id: build
         working-directory: ios-client
         run: |
-          mkdir -p Build
           set -o pipefail
-          xcodebuild clean archive \
+          xcodebuild clean build \
             -project GPSTracker.xcodeproj \
             -scheme GPSTracker \
             -configuration Debug \
-            -destination "generic/platform=iOS" \
-            -archivePath Build/GPSTracker.xcarchive \
+            -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
             2>&1 | tee Build/xcodebuild.log
 
       - name: 📤 Upload Build Log
@@ -48,11 +45,3 @@ jobs:
           name: build-log
           path: ios-client/Build/xcodebuild.log
           retention-days: 7
-
-      - name: 📤 Upload Archive
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: GPSTracker.xcarchive
-          path: ios-client/Build/GPSTracker.xcarchive
-          retention-days: 3
