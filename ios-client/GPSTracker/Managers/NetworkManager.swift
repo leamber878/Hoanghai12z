@@ -155,7 +155,7 @@ final class NetworkManager: ObservableObject {
                 "deviceId": LocationManager.shared.getDeviceInfo().deviceId,
                 "latitude": location.coordinate.latitude,
                 "longitude": location.coordinate.longitude,
-                "speed": location.speed >= 0 ? location.speed : nil as Any,
+                "speed": location.speed >= 0 ? location.speed as Any : NSNull(),
                 "altitude": location.altitude,
                 "batteryLevel": getBatteryLevel() as Any,
                 "timestamp": ISO8601DateFormatter().string(from: location.timestamp)

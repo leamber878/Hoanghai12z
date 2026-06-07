@@ -66,7 +66,7 @@ extension LocationPoint {
 }
 
 // MARK: - App States
-enum TrackingState {
+enum TrackingState: Equatable {
     case stopped
     case tracking
     case paused
