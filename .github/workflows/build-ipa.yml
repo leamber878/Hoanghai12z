@@ -24,19 +24,16 @@ jobs:
           xcodegen generate
           ls -la
 
-      - name: 🛠️ Build (simulator, no signing)
+      - name: 👀 List simulators
+        run: xcrun simctl list devices available 2>&1 | head -20
+
+      - name: 🛠️ Build for Simulator
         id: build
         working-directory: ios-client
         run: |
           set -o pipefail
-          xcodebuild clean build \
-            -project GPSTracker.xcodeproj \
-            -scheme GPSTracker \
-            -configuration Debug \
-            -destination "generic/platform=iOS Simulator" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            2>&1 | tee Build/xcodebuild.log
+          mkdir -p Build
+          xcodebuild -sdk iphonesimulator -project GPSTracker.xcodeproj -scheme GPSTracker -configuration Debug clean build 2>&1 | tee Build/xcodebuild.log
 
       - name: 📤 Upload Build Log
         if: failure()
